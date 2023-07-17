@@ -16,6 +16,8 @@
 #include <vterm.h>
 #include <gfxprim.h>
 
+#include "config.h"
+
 static gp_backend *backend;
 
 static VTerm *vt;
@@ -78,8 +80,14 @@ static void draw_cell(VTermPos pos)
 
 	vterm_screen_get_cell(vts, pos, &c);
 
+#ifdef HAVE_COLOR_INDEXED
 	gp_pixel bg = colors[c.bg.indexed.idx];
 	gp_pixel fg = colors[c.fg.indexed.idx];
+
+#else
+	gp_pixel bg = colors[c.bg.red];
+	gp_pixel fg = colors[c.fg.red];
+#endif
 
 	if (c.attrs.reverse)
 		GP_SWAP(bg, fg);
@@ -203,14 +211,14 @@ static int term_settermprop(VTermProp prop, VTermValue *val, void *user_data)
 
 	switch (prop) {
 	case VTERM_PROP_TITLE:
-		fprintf(stderr, "caption %s\n", val->string.str);
-		gp_backend_set_caption(backend, val->string.str);
+	//	fprintf(stderr, "caption %s\n", val->string.str);
+	//	gp_backend_set_caption(backend, val->string.str);
 		return 1;
 	case VTERM_PROP_ALTSCREEN:
 		fprintf(stderr, "altscreen\n");
 		return 0;
 	case VTERM_PROP_ICONNAME:
-		fprintf(stderr, "iconname %s\n", val->string.str);
+	//	fprintf(stderr, "iconname %s\n", val->string.str);
 		return 0;
 	case VTERM_PROP_CURSORSHAPE:
 		fprintf(stderr, "cursorshape %i\n", val->number);
@@ -295,15 +303,24 @@ static void term_init(void)
 
 	/* We use the vterm color as an array index */
 	for (i = 0; i < 16; i++) {
+#ifdef HAVE_COLOR_INDEXED
 		VTermColor col;
 		vterm_color_indexed(&col, i);
+#else
+		VTermColor col = {i, i, i};
+#endif
 		vterm_state_set_palette_color(vs, i, &col);
 	}
 
+#ifdef HAVE_COLOR_INDEXED
 	VTermColor bg, fg;
 
 	vterm_color_indexed(&bg, 0);
 	vterm_color_indexed(&fg, 7);
+#else
+	VTermColor bg = {0, 0, 0};
+	VTermColor fg = {7, 7, 7};
+#endif
 
 	vterm_state_set_default_colors(vs, &fg, &bg);
 

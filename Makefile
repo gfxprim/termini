@@ -1,7 +1,7 @@
 CFLAGS?=-W -Wall -Wextra -O2 -ggdb
 CFLAGS+=$(shell gfxprim-config --cflags)
 BIN=termini
-$(BIN): LDLIBS=-lgfxprim $(shell gfxprim-config --libs-backends) -lvterm
+$(BIN): LDLIBS=-lgfxprim $(shell gfxprim-config --libs-backends) -lvterm -lutil
 SOURCES=$(wildcard *.c)
 DEP=$(SOURCES:.c=.dep)
 OBJ=$(SOURCES:.c=.o)

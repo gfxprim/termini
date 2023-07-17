@@ -1,3 +1,4 @@
 termini
 *.o
 *.dep
+config.h
