@@ -109,11 +109,8 @@ static void draw_cell(VTermPos pos)
 
 	gp_text_style *style = c.attrs.bold ? text_style_bold : text_style;
 
-	char buf[5] = {};
-
-	gp_to_utf8(c.chars[0], buf);
-
-	gp_text(backend->pixmap, style, x, y, GP_ALIGN_RIGHT | GP_VALIGN_BELOW, fg, bg, buf);
+	if (c.chars[0])
+		gp_glyph_draw(backend->pixmap, style, x, y, GP_TEXT_BEARING, fg, bg, c.chars[0]);
 }
 
 static void update_rect(VTermRect rect)
