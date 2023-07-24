@@ -13,6 +13,7 @@
 #include <fcntl.h>
 #include <poll.h>
 #include <pty.h>
+#include <errno.h>
 #include <vterm.h>
 #include <gfxprim.h>
 
@@ -367,6 +368,9 @@ static int console_read(int fd)
 	if (len > 0)
 		vterm_input_write(vt, buf, len);
 
+	if (len < 0 && errno == EAGAIN)
+		len = 0;
+
 	return len;
 }
 
@@ -386,6 +390,7 @@ static void do_exit(int fd)
 	close_console(fd);
 	gp_backend_exit(backend);
 	vterm_free(vt);
+	exit(0);
 }
 
 static void key_to_console(gp_event *ev, int fd)
@@ -640,7 +645,8 @@ int main(int argc, char *argv[])
 			}
 		}
 
-		console_read(fd);
+		if (console_read(fd) < 0)
+			do_exit(fd);
 	}
 
 	return 0;
