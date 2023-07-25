@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Termini
+GenericName=Terminal
+Comment=Terminal emulator
+Exec=termini
+Terminal=false
+Type=Application
+Icon=/usr/share/termini/termini.png
+Categories=System;TerminalEmulator;
