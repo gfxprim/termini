@@ -103,7 +103,7 @@ static void draw_cell(VTermPos pos)
 	if (c.width > 1)
 		fprintf(stderr, "%i\n", c.width);
 */
-	if (c.chars[0] >= 0x2500) {
+	if (c.chars[0] >= 0x2500 && c.chars[0] <= 0x2524) {
 		draw_utf8_frames(x, y, c.chars[0], fg);
 		return;
 	}
@@ -408,20 +408,23 @@ static void key_to_console(gp_event *ev, int fd)
 	case GP_KEY_LEFT:
 		console_write(fd, "\eOD", 3);
 	break;
+	case GP_KEY_HOME:
+		console_write(fd, "\eOH", 3);
+	break;
+	case GP_KEY_INSERT:
+		console_write(fd, "\e[2~", 4);
+	break;
 	case GP_KEY_DELETE:
 		console_write(fd, "\e[3~", 4);
+	break;
+	case GP_KEY_END:
+		console_write(fd, "\eOF", 3);
 	break;
 	case GP_KEY_PAGE_UP:
 		console_write(fd, "\e[5~", 4);
 	break;
 	case GP_KEY_PAGE_DOWN:
 		console_write(fd, "\e[6~", 4);
-	break;
-	case GP_KEY_HOME:
-		console_write(fd, "\e[7~", 4);
-	break;
-	case GP_KEY_END:
-		console_write(fd, "\e[8~", 4);
 	break;
 	case GP_KEY_F1:
 		console_write(fd, "\e[11~", 5);
