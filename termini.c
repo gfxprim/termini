@@ -118,8 +118,8 @@ static void update_rect(VTermRect rect)
 {
 	int x = rect.start_col * char_width;
 	int y = rect.start_row * char_height;
-	int w = rect.end_col * char_width;
-	int h = rect.end_row * char_height;
+	int w = rect.end_col * char_width - 1;
+	int h = rect.end_row * char_height - 1;
 
 	gp_backend_update_rect_xyxy(backend, x, y, w, h);
 }
@@ -358,20 +358,31 @@ static void close_console(int fd)
 	close(fd);
 }
 
-static int console_read(int fd)
+static void do_exit(int fd)
+{
+	close_console(fd);
+	gp_backend_exit(backend);
+	vterm_free(vt);
+	exit(0);
+}
+
+static int console_read(gp_fd *self)
 {
 	char buf[1024];
 	int len;
+	int fd = self->pfd->fd;
 
 	len = read(fd, buf, sizeof(buf));
-
 	if (len > 0)
 		vterm_input_write(vt, buf, len);
 
 	if (len < 0 && errno == EAGAIN)
 		len = 0;
 
-	return len;
+	if (len < 0)
+		do_exit(fd);
+
+	return 0;
 }
 
 static void console_write(int fd, char *buf, int buf_len)
@@ -383,14 +394,6 @@ static void console_resize(int fd, int cols, int rows)
 {
 	struct winsize size = {rows, cols, 0, 0};
 	ioctl(fd, TIOCSWINSZ, &size);
-}
-
-static void do_exit(int fd)
-{
-	close_console(fd);
-	gp_backend_exit(backend);
-	vterm_free(vt);
-	exit(0);
 }
 
 static void key_to_console(gp_event *ev, int fd)
@@ -519,7 +522,7 @@ static void backend_init(const char *backend_opts)
 {
 	int i;
 
-	backend = gp_backend_init(backend_opts, "Termini");
+	backend = gp_backend_init(backend_opts, 0, 0, "Termini");
 	if (!backend) {
 		fprintf(stderr, "Failed to initalize backend\n");
 		exit(1);
@@ -603,18 +606,11 @@ int main(int argc, char *argv[])
 
 	int fd = open_console();
 
-	struct pollfd fds[2] = {
-		{.fd = fd, .events = POLLIN},
-		{.fd = backend->fd, .events = POLLIN}
-	};
-
+	gp_backend_fds_add(backend, fd, POLLIN, console_read, backend);
 	console_resize(fd, cols, rows);
 
 	for (;;) {
 		gp_event *ev;
-
-		if (poll(fds, 2, repaint_sleep_ms) == 0)
-			repaint_damage();
 
 		while ((ev = gp_backend_poll_event(backend))) {
 			switch (ev->type) {
@@ -648,8 +644,8 @@ int main(int argc, char *argv[])
 			}
 		}
 
-		if (console_read(fd) < 0)
-			do_exit(fd);
+		if (repaint_sleep_ms > 0)
+			repaint_damage();
 	}
 
 	return 0;
