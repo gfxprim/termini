@@ -33,9 +33,6 @@ static gp_text_style *text_style_bold;
 
 static gp_pixel colors[16];
 
-/* delay before we repaint merged damage */
-static int repaint_sleep_ms = -1;
-
 /* HACK to draw frames */
 static void draw_utf8_frames(int x, int y, uint32_t val, gp_pixel fg)
 {
@@ -156,7 +153,6 @@ static void repaint_damage(void)
 
 	update_rect(damaged);
 	damage_repainted = 1;
-	repaint_sleep_ms = -1;
 }
 
 
@@ -166,7 +162,6 @@ static int term_damage(VTermRect rect, void *user_data)
 
 	merge_damage(rect);
 //	fprintf(stderr, "rect: %i %i %i %i\n", rect.start_row, rect.end_row, rect.start_col, rect.end_col);
-	repaint_sleep_ms = 1;
 
 	return 1;
 }
@@ -381,6 +376,8 @@ static int console_read(gp_fd *self)
 
 	if (len < 0)
 		do_exit(fd);
+
+	repaint_damage();
 
 	return 0;
 }
@@ -612,7 +609,7 @@ int main(int argc, char *argv[])
 	for (;;) {
 		gp_event *ev;
 
-		while ((ev = gp_backend_poll_event(backend))) {
+		while ((ev = gp_backend_wait_event(backend))) {
 			switch (ev->type) {
 			case GP_EV_KEY:
 				if (ev->code == GP_EV_KEY_UP)
@@ -643,9 +640,6 @@ int main(int argc, char *argv[])
 			break;
 			}
 		}
-
-		if (repaint_sleep_ms > 0)
-			repaint_damage();
 	}
 
 	return 0;
