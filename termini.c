@@ -365,7 +365,7 @@ static int console_read(gp_fd *self)
 {
 	char buf[1024];
 	int len;
-	int fd = self->pfd->fd;
+	int fd = self->fd;
 
 	len = read(fd, buf, sizeof(buf));
 	if (len > 0)
@@ -603,7 +603,14 @@ int main(int argc, char *argv[])
 
 	int fd = open_console();
 
-	gp_backend_fds_add(backend, fd, POLLIN, console_read, backend);
+	gp_fd pfd = {
+		.fd = fd,
+		.event = console_read,
+		.events = GP_POLLIN,
+		.priv = backend,
+	};
+
+	gp_backend_poll_add(backend, &pfd);
 	console_resize(fd, cols, rows);
 
 	for (;;) {
