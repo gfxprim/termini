@@ -33,6 +33,9 @@ static gp_text_style *text_style_bold;
 
 static gp_pixel colors[16];
 
+static uint8_t fg_color_idx;
+static uint8_t bg_color_idx;
+
 /* HACK to draw frames */
 static void draw_utf8_frames(int x, int y, uint32_t val, gp_pixel fg)
 {
@@ -188,7 +191,7 @@ static int term_movecursor(VTermPos pos, VTermPos oldpos, int visible, void *use
 	x = pos.col * char_width;
 	y = pos.row * char_height;
 
-	gp_rect_xywh(backend->pixmap, x, y, char_width, char_height, 0xffffff);
+	gp_rect_xywh(backend->pixmap, x, y, char_width, char_height, colors[fg_color_idx]);
 	gp_backend_update_rect_xywh(backend, x, y, char_width, char_height);
 
 	//fprintf(stderr, "Move cursor %i %i -> %i %i!\n", oldpos.col, oldpos.row, pos.col, pos.row);
@@ -308,11 +311,11 @@ static void term_init(void)
 #ifdef HAVE_COLOR_INDEXED
 	VTermColor bg, fg;
 
-	vterm_color_indexed(&bg, 0);
-	vterm_color_indexed(&fg, 7);
+	vterm_color_indexed(&bg, bg_color_idx);
+	vterm_color_indexed(&fg, fg_color_idx);
 #else
-	VTermColor bg = {0, 0, 0};
-	VTermColor fg = {7, 7, 7};
+	VTermColor bg = {bg_color_idx, bg_color_idx, bg_color_idx};
+	VTermColor fg = {fg_color_idx, fg_color_idx, fg_color_idx};
 #endif
 
 	vterm_state_set_default_colors(vs, &fg, &bg);
@@ -323,7 +326,7 @@ static void term_init(void)
 /*
  * Forks and runs a shell, returns master fd.
  */
-static int open_console(void)
+static int open_console(char *term)
 {
 	int fd, pid, flags;
 
@@ -337,7 +340,7 @@ static int open_console(void)
 		if (!shell)
 			shell = "/bin/sh";
 
-		putenv("TERM=xterm");
+		putenv(term);
 
 		execl(shell, shell, NULL);
 	}
@@ -393,21 +396,9 @@ static void console_resize(int fd, int cols, int rows)
 	ioctl(fd, TIOCSWINSZ, &size);
 }
 
-static void key_to_console(gp_event *ev, int fd)
+static void key_to_console_common(gp_event *ev, int fd)
 {
 	switch (ev->key.key) {
-	case GP_KEY_UP:
-		console_write(fd, "\eOA", 3);
-	break;
-	case GP_KEY_DOWN:
-		console_write(fd, "\eOB", 3);
-	break;
-	case GP_KEY_RIGHT:
-		console_write(fd, "\eOC", 3);
-	break;
-	case GP_KEY_LEFT:
-		console_write(fd, "\eOD", 3);
-	break;
 	case GP_KEY_HOME:
 		console_write(fd, "\eOH", 3);
 	break;
@@ -463,7 +454,47 @@ static void key_to_console(gp_event *ev, int fd)
 		console_write(fd, "\e[24~", 5);
 	break;
 	}
-};
+}
+
+static void key_to_console_xterm(gp_event *ev, int fd)
+{
+	key_to_console_common(ev, fd);
+
+	switch (ev->key.key) {
+	case GP_KEY_UP:
+		console_write(fd, "\eOA", 3);
+	break;
+	case GP_KEY_DOWN:
+		console_write(fd, "\eOB", 3);
+	break;
+	case GP_KEY_RIGHT:
+		console_write(fd, "\eOC", 3);
+	break;
+	case GP_KEY_LEFT:
+		console_write(fd, "\eOD", 3);
+	break;
+	}
+}
+
+static void key_to_console_vt220(gp_event *ev, int fd)
+{
+	key_to_console_common(ev, fd);
+
+	switch (ev->key.key) {
+	case GP_KEY_UP:
+		console_write(fd, "\e[A", 3);
+	break;
+	case GP_KEY_DOWN:
+		console_write(fd, "\e[B", 3);
+	break;
+	case GP_KEY_RIGHT:
+		console_write(fd, "\e[C", 3);
+	break;
+	case GP_KEY_LEFT:
+		console_write(fd, "\e[D", 3);
+	break;
+	}
+}
 
 static void utf_to_console(gp_event *ev, int fd)
 {
@@ -515,21 +546,85 @@ struct RGB RGB_colors[16] = {
 	{0xff, 0xff, 0xff},
 };
 
-static void backend_init(const char *backend_opts)
+static void init_colors_rgb(gp_backend *backend)
 {
 	int i;
 
+	for (i = 0; i < 16; i++) {
+		colors[i] = gp_rgb_to_pixmap_pixel(RGB_colors[i].r,
+		                                   RGB_colors[i].g,
+		                                   RGB_colors[i].b,
+		                                   backend->pixmap);
+	}
+}
+
+/*
+ * Maps background white (black) and everything else black (white) that
+ * produces most readable output for monochrome.
+ */
+static void init_colors_1bpp(gp_backend *backend, int reverse)
+{
+	int i;
+
+	gp_pixel black = gp_rgb_to_pixmap_pixel(0x00, 0x00, 0x00, backend->pixmap);
+	gp_pixel white = gp_rgb_to_pixmap_pixel(0xff, 0xff, 0xff, backend->pixmap);
+
+	for (i = 0; i < 16; i++) {
+		if (i == bg_color_idx)
+			colors[i] = reverse ? black : white;
+		else
+			colors[i] = reverse ? white : black;
+	}
+}
+
+/*
+ * Maps background white (black) and foreground black (white), bright colors to
+ * light_gray (dark_gray) and dark colors to dark_gray (light_gray).
+ */
+static void init_colors_2bpp(gp_backend *backend, int reverse)
+{
+	int i;
+
+	gp_pixel black = gp_rgb_to_pixmap_pixel(0x00, 0x00, 0x00, backend->pixmap);
+	gp_pixel dark_gray = gp_rgb_to_pixmap_pixel(0x40, 0x40, 0x40, backend->pixmap);
+	gp_pixel light_gray = gp_rgb_to_pixmap_pixel(0x80, 0x80, 0x80, backend->pixmap);
+	gp_pixel white = gp_rgb_to_pixmap_pixel(0xff, 0xff, 0xff, backend->pixmap);
+
+	for (i = 0; i < 8; i++)
+		colors[i] = reverse ? dark_gray : light_gray;
+
+	for (i = 8; i < 16; i++)
+		colors[i] = reverse ? light_gray : dark_gray;
+
+	colors[fg_color_idx] = reverse ? white : black;
+	colors[bg_color_idx] = reverse ? black : white;
+}
+
+static void backend_init(const char *backend_opts, int reverse)
+{
 	backend = gp_backend_init(backend_opts, 0, 0, "Termini");
 	if (!backend) {
 		fprintf(stderr, "Failed to initalize backend\n");
 		exit(1);
 	}
 
-	for (i = 0; i < 16; i++) {
-		colors[i] = gp_rgb_to_pixmap_pixel(RGB_colors[i].r,
-		                                RGB_colors[i].g,
-		                                RGB_colors[i].b,
-		                                backend->pixmap);
+	if (reverse) {
+		bg_color_idx = 0;
+		fg_color_idx = 7;
+	} else {
+		fg_color_idx = 0;
+		bg_color_idx = 15;
+	}
+
+	switch (gp_pixel_size(backend->pixmap->pixel_type)) {
+	case 1:
+		init_colors_1bpp(backend, reverse);
+	break;
+	case 2:
+		init_colors_2bpp(backend, reverse);
+	break;
+	default:
+		init_colors_rgb(backend);
 	}
 }
 
@@ -538,10 +633,11 @@ static void print_help(const char *name, int exit_val)
 	gp_fonts_iter i;
 	const gp_font_family *f;
 
-	printf("usage: %s [-b backend_opts] [-f font_family]\n\n", name);
+	printf("usage: %s [-r] [-b backend_opts] [-F font_family]\n\n", name);
 
 	printf(" -b backend init string (pass -b help for options)\n");
-	printf(" -f gfpxrim font family\n");
+	printf(" -r reverse colors\n");
+	printf(" -F gfpxrim font family\n");
 	printf("    Available fonts families:\n");
 	GP_FONT_FAMILY_FOREACH(&i, f)
 		printf("\t - %s\n", f->family_name);
@@ -549,30 +645,46 @@ static void print_help(const char *name, int exit_val)
 	exit(exit_val);
 }
 
+/*
+ * Emulate vt220 for monochrome and grayscale, that limits most of the
+ * applications from using colors in a way that produce an unreadable output
+ * while it still makes most console functions keys compatible with xterm.
+ *
+ * However there are still applications that produce colors without checking
+ * the terminal capabilities for these we handpick color mapping for 1bpp and
+ * 2bpp below.
+ */
 int main(int argc, char *argv[])
 {
 	int opt;
 	const char *backend_opts = "x11";
 	const char *font_family = "haxor-narrow-18";
 	const gp_font_family *ffamily;
+	int reverse = 0;
+	int is_grayscale;
 
-	while ((opt = getopt(argc, argv, "b:f:h")) != -1) {
+	while ((opt = getopt(argc, argv, "b:F:hr")) != -1) {
 		switch (opt) {
 		case 'b':
 			backend_opts = optarg;
 		break;
-		case 'f':
+		case 'F':
 			font_family = optarg;
 		break;
 		case 'h':
 			print_help(argv[0], 0);
+		break;
+		case 'r':
+			reverse = 1;
 		break;
 		default:
 			print_help(argv[0], 1);
 		}
 	}
 
-	backend_init(backend_opts);
+	backend_init(backend_opts, reverse);
+
+	is_grayscale = gp_pixel_size(backend->pixmap->pixel_type) <= 4;
 
 	ffamily = gp_font_family_lookup(font_family);
 
@@ -601,7 +713,12 @@ int main(int argc, char *argv[])
 
 	term_init();
 
-	int fd = open_console();
+	int fd;
+
+	if (is_grayscale)
+		fd = open_console("TERM=vt220");
+	else
+		fd = open_console("TERM=xterm");
 
 	gp_fd pfd = {
 		.fd = fd,
@@ -622,7 +739,10 @@ int main(int argc, char *argv[])
 				if (ev->code == GP_EV_KEY_UP)
 					break;
 
-				key_to_console(ev, fd);
+				if (is_grayscale)
+					key_to_console_vt220(ev, fd);
+				else
+					key_to_console_xterm(ev, fd);
 			break;
 			case GP_EV_UTF:
 				utf_to_console(ev, fd);
