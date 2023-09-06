@@ -39,36 +39,39 @@ static uint8_t bg_color_idx;
 /* HACK to draw frames */
 static void draw_utf8_frames(int x, int y, uint32_t val, gp_pixel fg)
 {
+	int width = (char_width+1)/2;
+	int height = (char_height+1)/2;
+
 	switch (val) {
 	case 0x2500: /* Horizontal line */
-		gp_hline_xyw(backend->pixmap, x, y + char_height/2, char_width, fg);
+		gp_hline_xyw(backend->pixmap, x, y + height, char_width, fg);
 	break;
 	case 0x2502: /* Vertical line */
-		gp_vline_xyh(backend->pixmap, x + char_width/2, y, char_height, fg);
+		gp_vline_xyh(backend->pixmap, x + width, y, char_height, fg);
 	break;
 	case 0x250c: /* Upper left corner */
-		gp_hline_xyw(backend->pixmap, x + char_width/2, y + char_height/2, char_width/2, fg);
-		gp_vline_xyh(backend->pixmap, x + char_width/2, y + char_height/2, char_height/2+1, fg);
+		gp_hline_xyw(backend->pixmap, x + width, y + height, width, fg);
+		gp_vline_xyh(backend->pixmap, x + width, y + height, height+1, fg);
 	break;
 	case 0x2510: /* Upper right corner */
-		gp_hline_xyw(backend->pixmap, x, y + char_height/2, char_width/2, fg);
-		gp_vline_xyh(backend->pixmap, x + char_width/2, y + char_height/2, char_height/2+1, fg);
+		gp_hline_xyw(backend->pixmap, x, y + height, width, fg);
+		gp_vline_xyh(backend->pixmap, x + width, y + height, height+1, fg);
 	break;
 	case 0x2514: /* Bottom left corner */
-		gp_hline_xyw(backend->pixmap, x + char_width/2, y + char_height/2, char_width/2, fg);
-		gp_vline_xyh(backend->pixmap, x + char_width/2, y, char_height/2, fg);
+		gp_hline_xyw(backend->pixmap, x + width, y + height, width, fg);
+		gp_vline_xyh(backend->pixmap, x + width, y, height, fg);
 	break;
 	case 0x2518: /* Bottom right corner */
-		gp_hline_xyw(backend->pixmap, x, y + char_height/2, char_width/2, fg);
-		gp_vline_xyh(backend->pixmap, x + char_width/2, y, char_height/2+1, fg);
+		gp_hline_xyw(backend->pixmap, x, y + height, width, fg);
+		gp_vline_xyh(backend->pixmap, x + width, y, height+1, fg);
 	break;
 	case 0x251c: /* Left vertical tee */
-		gp_hline_xyw(backend->pixmap, x + char_width/2, y + char_height/2, char_width/2, fg);
-		gp_vline_xyh(backend->pixmap, x + char_width/2, y, char_height, fg);
+		gp_hline_xyw(backend->pixmap, x + width, y + height, width, fg);
+		gp_vline_xyh(backend->pixmap, x + width, y, char_height, fg);
 	break;
 	case 0x2524: /* Right vertical tee */
-		gp_hline_xyw(backend->pixmap, x, y + char_height/2, char_width/2, fg);
-		gp_vline_xyh(backend->pixmap, x + char_width/2, y, char_height, fg);
+		gp_hline_xyw(backend->pixmap, x, y + height, width, fg);
+		gp_vline_xyh(backend->pixmap, x + width, y, char_height, fg);
 	break;
 	default:
 		fprintf(stderr, "WARN: unhandled utf8 char %x\n", val);
