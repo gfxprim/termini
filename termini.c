@@ -124,7 +124,12 @@ static void update_rect(VTermRect rect)
 	int w = rect.end_col * char_width - 1;
 	int h = rect.end_row * char_height - 1;
 
-	gp_backend_update_rect_xyxy(backend, x, y, w, h);
+	if (rect.start_col == 0 && rect.start_row == 0 &&
+	    rect.end_col == cols && rect.end_row == rows) {
+		gp_backend_flip(backend);
+	} else {
+		gp_backend_update_rect_xyxy(backend, x, y, w, h);
+	}
 }
 
 static VTermRect damaged;
@@ -737,6 +742,8 @@ int main(int argc, char *argv[])
 	gp_backend_poll_add(backend, &pfd);
 	console_resize(fd, cols, rows);
 
+	gp_fill(backend->pixmap, colors[bg_color_idx]);
+
 	for (;;) {
 		gp_event *ev;
 
@@ -762,7 +769,7 @@ int main(int argc, char *argv[])
 					rows = ev->sys.h/char_height;
 					vterm_set_size(vt, rows, cols);
 					console_resize(fd, cols, rows);
-					gp_fill(backend->pixmap, 0);
+					gp_fill(backend->pixmap, colors[bg_color_idx]);
 					VTermRect rect = {.start_row = 0, .start_col = 0, .end_row = rows, .end_col = cols};
 					term_damage(rect, NULL);
 					//TODO cursor
