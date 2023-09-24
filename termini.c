@@ -685,11 +685,11 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	backend_init(backend_opts, reverse);
-
-	is_grayscale = gp_pixel_size(backend->pixmap->pixel_type) <= 4;
-
 	ffamily = gp_font_family_lookup(font_family);
+	if (!ffamily) {
+		fprintf(stderr, "Font family %s not found!\n", font_family);
+		return 1;
+	}
 
 	gp_text_style style = {
 		.font = gp_font_family_face_lookup(ffamily, GP_FONT_MONO),
@@ -708,6 +708,10 @@ int main(int argc, char *argv[])
 
 	char_width  = gp_text_max_width(text_style, 1);
 	char_height = gp_text_height(text_style);
+
+	backend_init(backend_opts, reverse);
+
+	is_grayscale = gp_pixel_size(backend->pixmap->pixel_type) <= 4;
 
 	cols = gp_pixmap_w(backend->pixmap)/char_width;
 	rows = gp_pixmap_h(backend->pixmap)/char_height;
