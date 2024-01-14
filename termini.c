@@ -665,7 +665,7 @@ static void print_help(const char *name, int exit_val)
 int main(int argc, char *argv[])
 {
 	int opt;
-	const char *backend_opts = "x11";
+	const char *backend_opts = NULL;
 	const char *font_family = "haxor-narrow-18";
 	const gp_font_family *ffamily;
 	int reverse = 0;
@@ -692,8 +692,8 @@ int main(int argc, char *argv[])
 
 	ffamily = gp_font_family_lookup(font_family);
 	if (!ffamily) {
-		fprintf(stderr, "Font family %s not found!\n", font_family);
-		return 1;
+		fprintf(stderr, "Error; Font family %s not found!\n\n", font_family);
+		print_help(argv[0], 1);
 	}
 
 	gp_text_style style = {
