@@ -293,6 +293,12 @@ static void term_init(void)
 {
 	int i;
 
+	if (rows == 0)
+		rows = 1;
+
+	if (cols == 0)
+		cols = 1;
+
 	vt = vterm_new(rows, cols);
 	vterm_set_utf8(vt, 1);
 
