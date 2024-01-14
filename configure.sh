@@ -1,6 +1,8 @@
 #!/bin/sh
 
-gcc -o /dev/null -x c - > /dev/null 2>&1 << EOF
+echo "// Generated file do not touch" > config.h
+
+gcc  -o /dev/null -x c - > /dev/null 2>&1 << EOF
 #include <vterm.h>
 int main(void)
 {
@@ -9,8 +11,6 @@ int main(void)
 	return 0;
 }
 EOF
-
-echo "// Generated file do not touch" > config.h
 
 if [ $? -ne 0 ]; then
 	echo "// HAVE_COLOR_INDEXED is not set" >> config.h
