@@ -1,0 +1,15 @@
+Source: termini
+Priority: extra
+Maintainer: Cyril Hrubis <metan@ucw.cz>
+Build-Depends: debhelper (>= 9.0), libgfxprim-dev, libvterm-dev
+Standards-Version: 4.0.0
+Section: misc
+Homepage: http://gfxprim.ucw.cz/
+
+Package: termini
+Section: misc
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: A gfxprim based terminal emulator
+ Terminal emulator based on the libvterm library for VT parsing and gfxprim for
+ the graphical output.
