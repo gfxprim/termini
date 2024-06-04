@@ -378,7 +378,7 @@ static void do_exit(int fd)
 	exit(0);
 }
 
-static int console_read(gp_fd *self)
+static enum gp_poll_event_ret console_read(gp_fd *self)
 {
 	char buf[1024];
 	int len;
