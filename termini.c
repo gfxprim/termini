@@ -778,6 +778,7 @@ int main(int argc, char *argv[])
 					gp_fill(backend->pixmap, colors[bg_color_idx]);
 					VTermRect rect = {.start_row = 0, .start_col = 0, .end_row = rows, .end_col = cols};
 					term_damage(rect, NULL);
+					repaint_damage();
 					//TODO cursor
 				break;
 				case GP_EV_SYS_QUIT:
