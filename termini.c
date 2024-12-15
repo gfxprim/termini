@@ -753,7 +753,7 @@ int main(int argc, char *argv[])
 	for (;;) {
 		gp_event *ev;
 
-		while ((ev = gp_backend_wait_event(backend))) {
+		while ((ev = gp_backend_ev_wait(backend))) {
 			switch (ev->type) {
 			case GP_EV_KEY:
 				if (ev->code == GP_EV_KEY_UP)
