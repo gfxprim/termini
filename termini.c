@@ -87,7 +87,6 @@ static void draw_cell(VTermPos pos)
 #ifdef HAVE_COLOR_INDEXED
 	gp_pixel bg = colors[c.bg.indexed.idx];
 	gp_pixel fg = colors[c.fg.indexed.idx];
-
 #else
 	gp_pixel bg = colors[c.bg.red];
 	gp_pixel fg = colors[c.fg.red];
@@ -135,6 +134,18 @@ static void update_rect(VTermRect rect)
 static VTermRect damaged;
 static int damage_repainted = 1;
 
+static int cursor_col;
+static int cursor_row;
+
+static void repaint_cursor(void)
+{
+	gp_coord x = cursor_col * char_width;
+	gp_coord y = cursor_row * char_height;
+
+	gp_rect_xywh(backend->pixmap, x, y, char_width, char_height, colors[fg_color_idx]);
+	gp_backend_update_rect_xywh(backend, x, y, char_width, char_height);
+}
+
 static void merge_damage(VTermRect rect)
 {
 	if (damage_repainted) {
@@ -148,7 +159,6 @@ static void merge_damage(VTermRect rect)
 
 	damaged.start_row = GP_MIN(damaged.start_row, rect.start_row);
 	damaged.end_row = GP_MAX(damaged.end_row, rect.end_row);
-
 }
 
 static void repaint_damage(void)
@@ -161,6 +171,10 @@ static void repaint_damage(void)
 			draw_cell(pos);
 		}
 	}
+
+	if (cursor_row >= damaged.start_row && cursor_row < damaged.end_row &&
+	    cursor_col >= damaged.start_col && cursor_col < damaged.end_col)
+		repaint_cursor();
 
 	update_rect(damaged);
 	damage_repainted = 1;
@@ -196,13 +210,12 @@ static int term_movecursor(VTermPos pos, VTermPos oldpos, int visible, void *use
 	draw_cell(oldpos);
 	gp_backend_update_rect_xywh(backend, x, y, char_width, char_height);
 
-	x = pos.col * char_width;
-	y = pos.row * char_height;
+	cursor_col = pos.col;
+	cursor_row = pos.row;
 
-	gp_rect_xywh(backend->pixmap, x, y, char_width, char_height, colors[fg_color_idx]);
-	gp_backend_update_rect_xywh(backend, x, y, char_width, char_height);
+	repaint_cursor();
 
-	//fprintf(stderr, "Move cursor %i %i -> %i %i!\n", oldpos.col, oldpos.row, pos.col, pos.row);
+	fprintf(stderr, "Move cursor %i %i -> %i %i!\n", oldpos.col, oldpos.row, pos.col, pos.row);
 
 	//vterm_screen_flush_damage(vts);
 
