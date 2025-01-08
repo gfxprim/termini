@@ -426,17 +426,11 @@ static void console_resize(int fd, int cols, int rows)
 static void key_to_console_common(gp_event *ev, int fd)
 {
 	switch (ev->key.key) {
-	case GP_KEY_HOME:
-		console_write(fd, "\eOH", 3);
-	break;
 	case GP_KEY_INSERT:
 		console_write(fd, "\e[2~", 4);
 	break;
 	case GP_KEY_DELETE:
 		console_write(fd, "\e[3~", 4);
-	break;
-	case GP_KEY_END:
-		console_write(fd, "\eOF", 3);
 	break;
 	case GP_KEY_PAGE_UP:
 		console_write(fd, "\e[5~", 4);
@@ -488,6 +482,12 @@ static void key_to_console_xterm(gp_event *ev, int fd)
 	key_to_console_common(ev, fd);
 
 	switch (ev->key.key) {
+	case GP_KEY_HOME:
+		console_write(fd, "\eOH", 3);
+	break;
+	case GP_KEY_END:
+		console_write(fd, "\eOF", 3);
+	break;
 	case GP_KEY_UP:
 		console_write(fd, "\eOA", 3);
 	break;
@@ -508,6 +508,12 @@ static void key_to_console_vt220(gp_event *ev, int fd)
 	key_to_console_common(ev, fd);
 
 	switch (ev->key.key) {
+	case GP_KEY_HOME:
+		console_write(fd, "\E[1~", 4);
+	break;
+	case GP_KEY_END:
+		console_write(fd, "\E[4~", 4);
+	break;
 	case GP_KEY_UP:
 		console_write(fd, "\e[A", 3);
 	break;
