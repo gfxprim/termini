@@ -426,6 +426,18 @@ static void console_resize(int fd, int cols, int rows)
 static void key_to_console_common(gp_event *ev, int fd)
 {
 	switch (ev->key.key) {
+	case GP_KEY_UP:
+		console_write(fd, "\eOA", 3);
+	break;
+	case GP_KEY_DOWN:
+		console_write(fd, "\eOB", 3);
+	break;
+	case GP_KEY_RIGHT:
+		console_write(fd, "\eOC", 3);
+	break;
+	case GP_KEY_LEFT:
+		console_write(fd, "\eOD", 3);
+	break;
 	case GP_KEY_INSERT:
 		console_write(fd, "\e[2~", 4);
 	break;
@@ -488,22 +500,10 @@ static void key_to_console_xterm(gp_event *ev, int fd)
 	case GP_KEY_END:
 		console_write(fd, "\eOF", 3);
 	break;
-	case GP_KEY_UP:
-		console_write(fd, "\eOA", 3);
-	break;
-	case GP_KEY_DOWN:
-		console_write(fd, "\eOB", 3);
-	break;
-	case GP_KEY_RIGHT:
-		console_write(fd, "\eOC", 3);
-	break;
-	case GP_KEY_LEFT:
-		console_write(fd, "\eOD", 3);
-	break;
 	}
 }
 
-static void key_to_console_vt220(gp_event *ev, int fd)
+static void key_to_console_xterm_r5(gp_event *ev, int fd)
 {
 	key_to_console_common(ev, fd);
 
@@ -513,18 +513,6 @@ static void key_to_console_vt220(gp_event *ev, int fd)
 	break;
 	case GP_KEY_END:
 		console_write(fd, "\E[4~", 4);
-	break;
-	case GP_KEY_UP:
-		console_write(fd, "\e[A", 3);
-	break;
-	case GP_KEY_DOWN:
-		console_write(fd, "\e[B", 3);
-	break;
-	case GP_KEY_RIGHT:
-		console_write(fd, "\e[C", 3);
-	break;
-	case GP_KEY_LEFT:
-		console_write(fd, "\e[D", 3);
 	break;
 	}
 }
@@ -753,7 +741,7 @@ int main(int argc, char *argv[])
 	int fd;
 
 	if (is_grayscale)
-		fd = open_console("TERM=vt220");
+		fd = open_console("TERM=xterm-r5");
 	else
 		fd = open_console("TERM=xterm");
 
@@ -779,7 +767,7 @@ int main(int argc, char *argv[])
 					break;
 
 				if (is_grayscale)
-					key_to_console_vt220(ev, fd);
+					key_to_console_xterm_r5(ev, fd);
 				else
 					key_to_console_xterm(ev, fd);
 			break;
