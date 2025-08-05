@@ -136,11 +136,15 @@ static int damage_repainted = 1;
 
 static int cursor_col;
 static int cursor_row;
+static int cursor_visible;
+static int cursor_disable;
 
 static void repaint_cursor(void)
 {
 	gp_coord x = cursor_col * char_width;
 	gp_coord y = cursor_row * char_height;
+
+//	fprintf(stderr, "Painting cursor %ux%u\n", cursor_col, cursor_row);
 
 	gp_rect_xywh(backend->pixmap, x, y, char_width, char_height, colors[fg_color_idx]);
 	gp_backend_update_rect_xywh(backend, x, y, char_width, char_height);
@@ -173,7 +177,8 @@ static void repaint_damage(void)
 	}
 
 	if (cursor_row >= damaged.start_row && cursor_row < damaged.end_row &&
-	    cursor_col >= damaged.start_col && cursor_col < damaged.end_col)
+	    cursor_col >= damaged.start_col && cursor_col < damaged.end_col &&
+	    cursor_visible)
 		repaint_cursor();
 
 	update_rect(damaged);
@@ -201,14 +206,31 @@ static int term_moverect(VTermRect dest, VTermRect src, void *user_data)
 	return 0;
 }
 
+static void clear_cursor(void)
+{
+	unsigned int x = cursor_col * char_width;
+	unsigned int y = cursor_row * char_height;
+
+	VTermPos pos = {.col = cursor_col, .row = cursor_row};
+
+	draw_cell(pos);
+
+//	fprintf(stderr, "Clearing cursor %ux%u\n", cursor_col, cursor_row);
+
+	gp_backend_update_rect_xywh(backend, x, y, char_width, char_height);
+}
+
 static int term_movecursor(VTermPos pos, VTermPos oldpos, int visible, void *user_data)
 {
 	(void)user_data;
-	unsigned int x = oldpos.col * char_width;
-	unsigned int y = oldpos.row * char_height;
 
-	draw_cell(oldpos);
-	gp_backend_update_rect_xywh(backend, x, y, char_width, char_height);
+	if (!cursor_visible || cursor_disable) {
+		cursor_col = pos.col;
+		cursor_row = pos.row;
+		return 1;
+	}
+
+	clear_cursor();
 
 	cursor_col = pos.col;
 	cursor_row = pos.row;
@@ -222,6 +244,19 @@ static int term_movecursor(VTermPos pos, VTermPos oldpos, int visible, void *use
 	return 1;
 }
 
+static void term_cursor_visible(int visible)
+{
+	if (visible == cursor_visible)
+		return;
+
+	if (visible)
+		repaint_cursor();
+	else
+		clear_cursor();
+
+	cursor_visible = visible;
+}
+
 static int term_settermprop(VTermProp prop, VTermValue *val, void *user_data)
 {
 	(void)user_data;
@@ -232,19 +267,22 @@ static int term_settermprop(VTermProp prop, VTermValue *val, void *user_data)
 	//	gp_backend_set_caption(backend, val->string.str);
 		return 1;
 	case VTERM_PROP_ALTSCREEN:
-		fprintf(stderr, "altscreen\n");
+		fprintf(stderr, "altscreen %i\n", val->boolean);
 		return 0;
 	case VTERM_PROP_ICONNAME:
 	//	fprintf(stderr, "iconname %s\n", val->string.str);
 		return 0;
 	case VTERM_PROP_CURSORSHAPE:
 		fprintf(stderr, "cursorshape %i\n", val->number);
+		//TODO: HACK!
+		term_cursor_visible(1);
 		return 0;
 	case VTERM_PROP_REVERSE:
 		fprintf(stderr, "reverse %i\n", val->boolean);
 		return 0;
 	case VTERM_PROP_CURSORVISIBLE:
 		fprintf(stderr, "cursorvisible %i\n", val->boolean);
+		term_cursor_visible(val->boolean);
 		return 0;
 	case VTERM_PROP_CURSORBLINK:
 		fprintf(stderr, "blink %i\n", val->boolean);
@@ -253,6 +291,7 @@ static int term_settermprop(VTermProp prop, VTermValue *val, void *user_data)
 		fprintf(stderr, "mouse %i\n", val->number);
 		return 0;
 	default:
+		fprintf(stderr, "PROP %i\n", prop);
 	break;
 	}
 
@@ -393,9 +432,14 @@ static void do_exit(int fd)
 
 static enum gp_poll_event_ret console_read(gp_fd *self)
 {
-	char buf[1024];
+	char buf[4096];
 	int len;
 	int fd = self->fd;
+
+	if (cursor_visible) {
+		clear_cursor();
+		cursor_disable = 1;
+	}
 
 	len = read(fd, buf, sizeof(buf));
 	if (len > 0)
@@ -408,6 +452,11 @@ static enum gp_poll_event_ret console_read(gp_fd *self)
 		do_exit(fd);
 
 	repaint_damage();
+
+	if (cursor_visible) {
+		cursor_disable = 0;
+		repaint_cursor();
+	}
 
 	return 0;
 }
@@ -761,6 +810,7 @@ int main(int argc, char *argv[])
 		gp_event *ev;
 
 		while ((ev = gp_backend_ev_wait(backend))) {
+			//gp_ev_dump(ev);
 			switch (ev->type) {
 			case GP_EV_KEY:
 				if (ev->code == GP_EV_KEY_UP)
