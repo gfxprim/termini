@@ -19,6 +19,8 @@
 
 #include "config.h"
 
+#define HIDE_CURSOR_TIMEOUT 1000
+
 static gp_backend *backend;
 
 static VTerm *vt;
@@ -670,6 +672,38 @@ static void init_colors_2bpp(gp_backend *backend, int reverse)
 	colors[bg_color_idx] = reverse ? black : white;
 }
 
+static int cursor_hidden;
+
+static uint32_t hide_cursor(gp_timer *self)
+{
+	gp_backend_cursor_set(backend, GP_BACKEND_CURSOR_HIDE);
+
+	cursor_hidden = 1;
+
+	return GP_TIMER_STOP;
+}
+
+static gp_timer hide_cursor_timer = {
+	.callback = hide_cursor,
+	.id = "Hide Cursor",
+	.expires = HIDE_CURSOR_TIMEOUT,
+};
+
+static void hide_cursor_reschedule(void)
+{
+	if (gp_timer_running(&hide_cursor_timer))
+		gp_backend_timer_rem(backend, &hide_cursor_timer);
+
+	if (cursor_hidden) {
+		cursor_hidden = 0;
+		gp_backend_cursor_set(backend, GP_BACKEND_CURSOR_SHOW);
+	}
+
+	hide_cursor_timer.expires = HIDE_CURSOR_TIMEOUT;
+
+	gp_backend_timer_add(backend, &hide_cursor_timer);
+}
+
 static void backend_init(const char *backend_opts, int reverse)
 {
 	backend = gp_backend_init(backend_opts, 0, 0, "Termini");
@@ -696,6 +730,9 @@ static void backend_init(const char *backend_opts, int reverse)
 	default:
 		init_colors_rgb(backend);
 	}
+
+	gp_backend_cursor_set(backend, GP_BACKEND_CURSOR_TEXT_EDIT);
+	gp_backend_timer_add(backend, &hide_cursor_timer);
 }
 
 static void print_help(const char *name, int exit_val)
@@ -824,6 +861,10 @@ int main(int argc, char *argv[])
 			case GP_EV_UTF:
 				utf_to_console(ev, fd);
 			break;
+			case GP_EV_REL:
+			case GP_EV_ABS:
+				hide_cursor_reschedule();
+			break;
 			case GP_EV_SYS:
 				switch (ev->code) {
 				case GP_EV_SYS_RESIZE:
@@ -836,7 +877,6 @@ int main(int argc, char *argv[])
 					VTermRect rect = {.start_row = 0, .start_col = 0, .end_row = rows, .end_col = cols};
 					term_damage(rect, NULL);
 					repaint_damage();
-					//TODO cursor
 				break;
 				case GP_EV_SYS_QUIT:
 					do_exit(fd);
