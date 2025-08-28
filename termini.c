@@ -828,8 +828,8 @@ int main(int argc, char *argv[])
 				switch (ev->code) {
 				case GP_EV_SYS_RESIZE:
 					gp_backend_resize_ack(backend);
-					cols = ev->sys.w/char_width;
-					rows = ev->sys.h/char_height;
+					cols = GP_MAX(1u, ev->sys.w/char_width);
+					rows = GP_MAX(1u, ev->sys.h/char_height);
 					vterm_set_size(vt, rows, cols);
 					console_resize(fd, cols, rows);
 					gp_fill(backend->pixmap, colors[bg_color_idx]);
