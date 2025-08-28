@@ -463,9 +463,16 @@ static enum gp_poll_event_ret console_read(gp_fd *self)
 	return 0;
 }
 
-static void console_write(int fd, char *buf, int buf_len)
+static void console_write(int fd, const char *buf, int buf_len)
 {
 	write(fd, buf, buf_len);
+}
+
+static void term_output_callback(const char *buf, size_t len, void *usr)
+{
+	int fd = *(int*)usr;
+
+	console_write(fd, buf, len);
 }
 
 static void console_resize(int fd, int cols, int rows)
@@ -573,7 +580,7 @@ static void utf_to_console(gp_event *ev, int fd)
 	char utf_buf[4];
 	int bytes = gp_to_utf8(ev->utf.ch, utf_buf);
 
-	write(fd, utf_buf, bytes);
+	console_write(fd, utf_buf, bytes);
 }
 
 struct RGB {
@@ -704,6 +711,19 @@ static void hide_cursor_reschedule(void)
 	gp_backend_timer_add(backend, &hide_cursor_timer);
 }
 
+static void clipboard_to_console(int fd)
+{
+	char *clipboard, *c;
+
+	clipboard = gp_backend_clipboard_get(backend);
+	if (!clipboard)
+		return;
+
+	console_write(fd, clipboard, strlen(clipboard));
+
+	free(clipboard);
+}
+
 static void backend_init(const char *backend_opts, int reverse)
 {
 	backend = gp_backend_init(backend_opts, 0, 0, "Termini");
@@ -831,6 +851,8 @@ int main(int argc, char *argv[])
 	else
 		fd = open_console("TERM=xterm");
 
+	vterm_output_set_callback(vt, term_output_callback, &fd);
+
 	gp_fd pfd = {
 		.fd = fd,
 		.event = console_read,
@@ -852,6 +874,11 @@ int main(int argc, char *argv[])
 			case GP_EV_KEY:
 				if (ev->code == GP_EV_KEY_UP)
 					break;
+
+				if (ev->val == GP_BTN_MIDDLE) {
+					gp_backend_clipboard_request(backend);
+					continue;
+				}
 
 				if (is_grayscale)
 					key_to_console_xterm_r5(ev, fd);
@@ -880,6 +907,9 @@ int main(int argc, char *argv[])
 				break;
 				case GP_EV_SYS_QUIT:
 					do_exit(fd);
+				break;
+				case GP_EV_SYS_CLIPBOARD:
+					clipboard_to_console(fd);
 				break;
 				}
 			break;
