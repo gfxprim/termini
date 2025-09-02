@@ -1,6 +1,6 @@
 //SPDX-License-Identifier: GPL-2.1-or-later
 /*
- * Copyright (C) 2023 Cyril Hrubis <metan@ucw.cz>
+ * Copyright (C) 2023-2025 Cyril Hrubis <metan@ucw.cz>
  */
 
  /*
@@ -19,6 +19,8 @@
 
 #include "config.h"
 
+#include "xterm_256_palette.h"
+
 #define HIDE_CURSOR_TIMEOUT 1000
 
 static gp_backend *backend;
@@ -33,7 +35,7 @@ static unsigned int char_height;
 static gp_text_style *text_style;
 static gp_text_style *text_style_bold;
 
-static gp_pixel colors[16];
+static gp_pixel colors[256];
 
 static uint8_t fg_color_idx;
 static uint8_t bg_color_idx;
@@ -292,6 +294,9 @@ static int term_settermprop(VTermProp prop, VTermValue *val, void *user_data)
 	case VTERM_PROP_MOUSE:
 		fprintf(stderr, "mouse %i\n", val->number);
 		return 0;
+	case VTERM_PROP_FOCUSREPORT:
+		fprintf(stderr, "focus report %i\n", val->boolean);
+	break;
 	default:
 		fprintf(stderr, "PROP %i\n", prop);
 	break;
@@ -394,7 +399,7 @@ static void term_init(void)
 /*
  * Forks and runs a shell, returns master fd.
  */
-static int open_console(char *term)
+static int open_console(const char *term, const char *color)
 {
 	int fd, pid, flags;
 
@@ -409,6 +414,9 @@ static int open_console(char *term)
 			shell = "/bin/sh";
 
 		putenv(term);
+
+		if (color)
+			putenv(color);
 
 		execl(shell, shell, NULL);
 	}
@@ -583,53 +591,11 @@ static void utf_to_console(gp_event *ev, int fd)
 	console_write(fd, utf_buf, bytes);
 }
 
-struct RGB {
-	uint8_t r;
-	uint8_t g;
-	uint8_t b;
-};
-
-struct RGB RGB_colors[16] = {
-	/* BLACK */
-	{0x00, 0x00, 0x00},
-	/* RED */
-	{0xcd, 0x00, 0x00},
-	/* GREEN */
-	{0x00, 0xcd, 0x00},
-	/* YELLOW */
-	{0xcd, 0xcd, 0x00},
-	/* BLUE */
-	{0x00, 0x00, 0xee},
-	/* MAGENTA */
-	{0xcd, 0x00, 0xcd},
-	/* CYAN */
-	{0x00, 0xcd, 0xcd},
-	/* GRAY */
-	{0xe5, 0xe5, 0xe5},
-
-	/* BRIGHT BLACK */
-	{0x7f, 0x7f, 0x7f},
-	/* BRIGHT RED */
-	{0xff, 0x00, 0x00},
-	/* BRIGHT GREEN */
-	{0x00, 0xff, 0x00},
-	/* BRIGHT YELLOW */
-	{0xff, 0xff, 0x00},
-	/* BRIGHT BLUE */
-	{0x5c, 0x5c, 0xff},
-	/* BRIGHT MAGENTA */
-	{0xff, 0x00, 0xff},
-	/* BRIGHT CYAN */
-	{0x00, 0xff, 0xff},
-	/* WHITE */
-	{0xff, 0xff, 0xff},
-};
-
 static void init_colors_rgb(gp_backend *backend)
 {
-	int i;
+	size_t i;
 
-	for (i = 0; i < 16; i++) {
+	for (i = 0; i < GP_ARRAY_SIZE(colors); i++) {
 		colors[i] = gp_rgb_to_pixmap_pixel(RGB_colors[i].r,
 		                                   RGB_colors[i].g,
 		                                   RGB_colors[i].b,
@@ -786,9 +752,11 @@ int main(int argc, char *argv[])
 	int opt;
 	const char *backend_opts = NULL;
 	const char *font_family = "haxor-narrow-18";
+	const char *color_fg_bg = NULL;
 	const gp_font_family *ffamily;
 	int reverse = 0;
 	int is_grayscale;
+	const char *color = NULL;;
 
 	while ((opt = getopt(argc, argv, "b:F:hr")) != -1) {
 		switch (opt) {
@@ -803,6 +771,8 @@ int main(int argc, char *argv[])
 		break;
 		case 'r':
 			reverse = 1;
+			/* libvterm does not implement xterm specific CSI to get fg/bg */
+			color_fg_bg="COLORFGBG=7;0";
 		break;
 		default:
 			print_help(argv[0], 1);
@@ -847,9 +817,9 @@ int main(int argc, char *argv[])
 	int fd;
 
 	if (is_grayscale)
-		fd = open_console("TERM=xterm-r5");
+		fd = open_console("TERM=xterm-r5", color_fg_bg);
 	else
-		fd = open_console("TERM=xterm");
+		fd = open_console("TERM=xterm", color_fg_bg);
 
 	vterm_output_set_callback(vt, term_output_callback, &fd);
 
