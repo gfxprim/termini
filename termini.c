@@ -294,9 +294,11 @@ static int term_settermprop(VTermProp prop, VTermValue *val, void *user_data)
 	case VTERM_PROP_MOUSE:
 		fprintf(stderr, "mouse %i\n", val->number);
 		return 0;
+#ifdef VTERM_PROP_FOCUSREPORT
 	case VTERM_PROP_FOCUSREPORT:
 		fprintf(stderr, "focus report %i\n", val->boolean);
 	break;
+#endif
 	default:
 		fprintf(stderr, "PROP %i\n", prop);
 	break;
