@@ -40,6 +40,8 @@ static gp_pixel colors[256];
 static uint8_t fg_color_idx;
 static uint8_t bg_color_idx;
 
+static int focused = 0;
+
 /* HACK to draw frames */
 static void draw_utf8_frames(int x, int y, uint32_t val, gp_pixel fg)
 {
@@ -82,7 +84,7 @@ static void draw_utf8_frames(int x, int y, uint32_t val, gp_pixel fg)
 	}
 }
 
-static void draw_cell(VTermPos pos)
+static void draw_cell(VTermPos pos, int is_cursor)
 {
 	VTermScreenCell c;
 
@@ -97,6 +99,9 @@ static void draw_cell(VTermPos pos)
 #endif
 
 	if (c.attrs.reverse)
+		GP_SWAP(bg, fg);
+
+	if (is_cursor && focused)
 		GP_SWAP(bg, fg);
 
 	int x = pos.col * char_width;
@@ -118,6 +123,9 @@ static void draw_cell(VTermPos pos)
 
 	if (c.chars[0])
 		gp_glyph_draw(backend->pixmap, style, x, y, GP_TEXT_BEARING, fg, bg, c.chars[0]);
+
+	if (is_cursor && !focused)
+		gp_rect_xywh(backend->pixmap, x, y, char_width, char_height, colors[fg_color_idx]);
 }
 
 static void update_rect(VTermRect rect)
@@ -145,12 +153,15 @@ static int cursor_disable;
 
 static void repaint_cursor(void)
 {
-	gp_coord x = cursor_col * char_width;
-	gp_coord y = cursor_row * char_height;
+	unsigned int x = cursor_col * char_width;
+	unsigned int y = cursor_row * char_height;
+
+	VTermPos pos = {.col = cursor_col, .row = cursor_row};
+
+	draw_cell(pos, 1);
 
 //	fprintf(stderr, "Painting cursor %ux%u\n", cursor_col, cursor_row);
 
-	gp_rect_xywh(backend->pixmap, x, y, char_width, char_height, colors[fg_color_idx]);
 	gp_backend_update_rect_xywh(backend, x, y, char_width, char_height);
 }
 
@@ -176,7 +187,7 @@ static void repaint_damage(void)
 	for (row = damaged.start_row; row < damaged.end_row; row++) {
 		for (col = damaged.start_col; col < damaged.end_col; col++) {
 			VTermPos pos = {.row = row, .col = col};
-			draw_cell(pos);
+			draw_cell(pos, 0);
 		}
 	}
 
@@ -217,7 +228,7 @@ static void clear_cursor(void)
 
 	VTermPos pos = {.col = cursor_col, .row = cursor_row};
 
-	draw_cell(pos);
+	draw_cell(pos, 0);
 
 //	fprintf(stderr, "Clearing cursor %ux%u\n", cursor_col, cursor_row);
 
@@ -882,6 +893,11 @@ int main(int argc, char *argv[])
 				break;
 				case GP_EV_SYS_CLIPBOARD:
 					clipboard_to_console(fd);
+				break;
+				case GP_EV_SYS_FOCUS:
+					focused = ev->val;
+					if (cursor_visible)
+						repaint_cursor();
 				break;
 				}
 			break;
