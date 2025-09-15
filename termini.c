@@ -79,6 +79,18 @@ static void draw_utf8_frames(int x, int y, uint32_t val, gp_pixel fg)
 		gp_hline_xyw(backend->pixmap, x, y + height, width, fg);
 		gp_vline_xyh(backend->pixmap, x + width, y, char_height, fg);
 	break;
+	case 0x0252c: /* Top tee */
+		gp_hline_xyw(backend->pixmap, x, y + height, char_width, fg);
+		gp_vline_xyh(backend->pixmap, x + width, y + height, height, fg);
+	break;
+	case 0x02534: /* Bottom tee */
+		gp_hline_xyw(backend->pixmap, x, y + height, char_width, fg);
+		gp_vline_xyh(backend->pixmap, x + width, y, height, fg);
+	break;
+	case 0x0253c: /* Cross */
+		gp_hline_xyw(backend->pixmap, x, y + height, char_width, fg);
+		gp_vline_xyh(backend->pixmap, x + width, y, char_height, fg);
+	break;
 	default:
 		fprintf(stderr, "WARN: unhandled utf8 char %x\n", val);
 	}
@@ -114,7 +126,7 @@ static void draw_cell(VTermPos pos, int is_cursor)
 	if (c.width > 1)
 		fprintf(stderr, "%i\n", c.width);
 */
-	if (c.chars[0] >= 0x2500 && c.chars[0] <= 0x2524) {
+	if (c.chars[0] >= 0x2500 && c.chars[0] <= 0x257f) {
 		draw_utf8_frames(x, y, c.chars[0], fg);
 		return;
 	}
