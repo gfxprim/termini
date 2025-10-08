@@ -870,7 +870,11 @@ int main(int argc, char *argv[])
 				if (ev->code == GP_EV_KEY_UP)
 					break;
 
-				if (ev->val == GP_BTN_MIDDLE) {
+				if (ev->val == GP_BTN_MIDDLE ||
+				    (gp_ev_any_key_pressed(ev, GP_KEY_LEFT_CTRL, GP_KEY_RIGHT_CTRL)
+				     && ev->val == GP_KEY_SPACE) ||
+				    (gp_ev_any_key_pressed(ev, GP_KEY_LEFT_SHIFT, GP_KEY_RIGHT_SHIFT)
+				     && ev->val == GP_KEY_INSERT)) {
 					gp_backend_clipboard_request(backend);
 					continue;
 				}
