@@ -689,8 +689,8 @@ static gp_timer hide_cursor_timer = {
 
 static void hide_cursor_reschedule(void)
 {
-	if (gp_timer_running(&hide_cursor_timer))
-		gp_backend_timer_rem(backend, &hide_cursor_timer);
+	if (gp_timer_is_running(&hide_cursor_timer))
+		gp_backend_timer_stop(backend, &hide_cursor_timer);
 
 	if (cursor_hidden) {
 		cursor_hidden = 0;
@@ -699,7 +699,7 @@ static void hide_cursor_reschedule(void)
 
 	hide_cursor_timer.expires = HIDE_CURSOR_TIMEOUT;
 
-	gp_backend_timer_add(backend, &hide_cursor_timer);
+	gp_backend_timer_start(backend, &hide_cursor_timer);
 }
 
 static void clipboard_to_console(int fd)
@@ -743,7 +743,7 @@ static void backend_init(const char *backend_opts, int reverse)
 	}
 
 	gp_backend_cursor_set(backend, GP_BACKEND_CURSOR_TEXT_EDIT);
-	gp_backend_timer_add(backend, &hide_cursor_timer);
+	gp_backend_timer_start(backend, &hide_cursor_timer);
 }
 
 static void print_help(const char *name, int exit_val)
